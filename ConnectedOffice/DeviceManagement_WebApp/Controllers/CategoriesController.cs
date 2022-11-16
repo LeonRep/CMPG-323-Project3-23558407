@@ -3,44 +3,26 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
-using DeviceManagement_WebApp.Data;
 using DeviceManagement_WebApp.Models;
+using DeviceManagement_WebApp.Repository;
 
 namespace DeviceManagement_WebApp.Controllers
 {
     public class CategoriesController : Controller
     {
-        private readonly ConnectedOfficeContext _context;
 
-        public CategoriesController(ConnectedOfficeContext context)
+        private readonly ICategoriesRepository categoriesRepository;
+
+        public CategoriesController(ICategoriesRepository categoriesRepository)
         {
-            _context = context;
+            this.categoriesRepository = categoriesRepository;
         }
 
         // GET: Categories
         public async Task<IActionResult> Index()
         {
-            return View(await _context.Category.ToListAsync());
-        }
-
-        // GET: Categories/Details/5
-        public async Task<IActionResult> Details(Guid? id)
-        {
-            if (id == null)
-            {
-                return NotFound();
-            }
-
-            var category = await _context.Category
-                .FirstOrDefaultAsync(m => m.CategoryId == id);
-            if (category == null)
-            {
-                return NotFound();
-            }
-
-            return View(category);
+            return View(categoriesRepository.GetAll());
         }
 
         // GET: Categories/Create
@@ -56,10 +38,14 @@ namespace DeviceManagement_WebApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create([Bind("CategoryId,CategoryName,CategoryDescription,DateCreated")] Category category)
         {
-            category.CategoryId = Guid.NewGuid();
-            _context.Add(category);
-            await _context.SaveChangesAsync();
-            return RedirectToAction(nameof(Index));
+            if (ModelState.IsValid)
+            {
+                category.CategoryId = Guid.NewGuid();
+                categoriesRepository.Add(category);
+                categoriesRepository.SaveAll();
+                return RedirectToAction(nameof(Index));
+            }
+            return View(category);
         }
 
         // GET: Categories/Edit/5
@@ -70,7 +56,7 @@ namespace DeviceManagement_WebApp.Controllers
                 return NotFound();
             }
 
-            var category = await _context.Category.FindAsync(id);
+            var category = categoriesRepository.GetById(id);
             if (category == null)
             {
                 return NotFound();
@@ -89,23 +75,20 @@ namespace DeviceManagement_WebApp.Controllers
             {
                 return NotFound();
             }
-            try
+
+            if (ModelState.IsValid)
             {
-                _context.Update(category);
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!CategoryExists(category.CategoryId))
+                try
                 {
-                    return NotFound();
+                    categoriesRepository.Update(category);
+                    categoriesRepository.SaveAll();
                 }
-                else
+                catch (DbUpdateConcurrencyException)
                 {
-                    throw;
                 }
+                return RedirectToAction(nameof(Index));
             }
-            return RedirectToAction(nameof(Index));
+            return View(category);
         }
 
         // GET: Categories/Delete/5
@@ -116,8 +99,7 @@ namespace DeviceManagement_WebApp.Controllers
                 return NotFound();
             }
 
-            var category = await _context.Category
-                .FirstOrDefaultAsync(m => m.CategoryId == id);
+            var category = categoriesRepository.GetById(id);
             if (category == null)
             {
                 return NotFound();
@@ -131,15 +113,11 @@ namespace DeviceManagement_WebApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(Guid id)
         {
-            var category = await _context.Category.FindAsync(id);
-            _context.Category.Remove(category);
-            await _context.SaveChangesAsync();
+            var category = categoriesRepository.GetById(id);
+            categoriesRepository.Remove(category);
+            categoriesRepository.SaveAll();
             return RedirectToAction(nameof(Index));
         }
 
-        private bool CategoryExists(Guid id)
-        {
-            return _context.Category.Any(e => e.CategoryId == id);
-        }
     }
 }
